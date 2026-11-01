@@ -78,14 +78,10 @@ user=r.data.user;
 await start();
 }catch(e){say('message','Application error: '+(e.message||String(e)))}
 }
-let email=$('email').value.trim(),password=$('password').value;
-if(!email||password.length<8){say('message','Enter your email and a password of at least 8 characters.');return}
-say('message','Connecting...');
-let r=mode==='up'?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});
-if(r.error){say('message',r.error.message);return}
-if(mode==='up'&&!r.data.session){say('message','Account created. Check your email to confirm, then sign in.');return}
-user=r.data.user;await start();
-}
+
+
+
+
 async function start(){
 $('login').classList.add('hidden');$('app').classList.remove('hidden');say('cloud','Loading cloud records...');
 let r=await db.from('opportunities').select('*').order('created_at',{ascending:false});
