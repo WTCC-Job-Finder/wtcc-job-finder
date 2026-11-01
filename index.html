@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WTCC Job Finder</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b0e12;color:#eef3f7;font:15px Arial;padding:18px}h1{color:#d4dce3;letter-spacing:2px}h2{color:#27a8e8}.card{background:#151c24;border:1px solid #34414d;border-radius:12px;padding:16px;margin:14px 0}input,select,textarea{width:100%;padding:12px;margin:6px 0 12px;background:#0b1016;color:white;border:1px solid #394653;border-radius:7px}button{padding:12px 16px;margin:4px;background:#176f91;color:white;border:0;border-radius:7px;font-weight:bold}button.secondary{background:#303b47}small,.muted{color:#9aa9b6}.hidden{display:none}.lead{border-bottom:1px solid #34414d;padding:12px 0}.status{color:#27c3b2;font-size:12px}label{color:#b9c6d0}
+</style>
+</head>
+<body>
+<h1>WTCC JOB FINDER</h1>
+<p class="muted">WEST TEXAS CONSTRUCTION & CHEMICALS LLC</p>
+<div class="card" id="login">
+<h2>Owner Sign In</h2>
+<input id="email" type="email" placeholder="Email address">
+<input id="password" type="password" placeholder="Password — at least 8 characters">
+<button onclick="auth('in')">Sign In</button>
+<button class="secondary" onclick="auth('up')">Create Account</button>
+<p id="message" class="status"></p>
+</div>
+<div id="app" class="hidden">
+<div class="card">
+<h2>Command Dashboard</h2>
+<p id="cloud" class="status">Connecting...</p>
+<p>Opportunities: <b id="count">0</b></p>
+<button class="secondary" onclick="logout()">Sign Out</button>
+</div>
+<div class="card">
+<h2>Add Opportunity</h2>
+<label>Project / Job Title *</label>
+<input id="title" placeholder="Example: Commercial building remodel">
+<label>Business / Customer</label>
+<input id="business" placeholder="Business name">
+<label>Trade / Service</label>
+<select id="trade">
+<option>General contracting</option><option>Residential construction</option><option>Commercial construction</option><option>Remodeling</option><option>Concrete</option><option>Framing</option><option>Roofing</option><option>Drywall / insulation</option><option>Flooring / tile</option><option>Painting</option><option>Welding</option><option>Property maintenance</option><option>Landscaping / tree care</option><option>Junk removal / power washing</option><option>Subcontracting</option><option>Clothing & accessories</option><option>Other</option>
+</select>
+<label>Location</label>
+<input id="location" placeholder="City, Texas">
+<label>Estimated Project Value ($)</label>
+<input id="value" type="number" placeholder="Estimated value">
+<label>Contact Name</label>
+<input id="contact" placeholder="Contact person">
+<label>Phone or Email</label>
+<input id="contactinfo" placeholder="Business contact information">
+<label>Source</label>
+<select id="source"><option>Manual entry</option><option>Google</option><option>Facebook</option><option>LinkedIn</option><option>Referral</option><option>SAM.gov</option><option>Texas procurement</option><option>Other</option></select>
+<label>Opportunity Details</label>
+<textarea id="notes" placeholder="Scope, deadlines, project details..."></textarea>
+<button onclick="addLead()">Save Opportunity</button>
+<p id="saveMessage" class="status"></p>
+</div>
+<div class="card">
+<h2>Opportunity Pipeline</h2>
+<input id="search" placeholder="Search opportunities..." oninput="render()">
+<div id="leads"></div>
+</div>
+</div>
+<script>
+const URL="https://ogotiipxtklpdcfzcskf.supabase.co";
+const KEY="sb_publishable_Ho14cZshVRJHS66v6za92w_UvjUmh-A";
+const db=supabase.createClient(URL,KEY);
+let user=null,leads=[];
+const $=id=>document.getElementById(id);
+function say(id,msg){$(id).textContent=msg}
+async function auth(mode){
+let email=$('email').value.trim(),password=$('password').value;
+if(!email||password.length<8){say('message','Enter your email and a password of at least 8 characters.');return}
+say('message','Connecting...');
+let r=mode==='up'?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});
+if(r.error){say('message',r.error.message);return}
+if(mode==='up'&&!r.data.session){say('message','Account created. Check your email to confirm, then sign in.');return}
+user=r.data.user;await start();
+}
+async function start(){
+$('login').classList.add('hidden');$('app').classList.remove('hidden');say('cloud','Loading cloud records...');
+let r=await db.from('opportunities').select('*').order('created_at',{ascending:false});
+if(r.error){say('cloud','Database error: '+r.error.message);return}
+leads=(r.data||[]).map(x=>({...x}));
+say('cloud','Cloud connected · '+leads.length+' opportunities');render();
+}
+async function addLead(){
+let title=$('title').value.trim();
+if(!title){say('saveMessage','Enter a project title first.');return}
+let row={owner_id:user.id,title,business_name:$('business').value.trim(),trade:$('trade').value,category:$('trade').value,location:$('location').value.trim(),estimated_value:Number($('value').value)||null,contact_name:$('contact').value.trim(),contact_info:$('contactinfo').value.trim(),source_name:$('source').value,notes:$('notes').value.trim(),description:$('notes').value.trim(),status:'Review needed',approval_required:true};
+say('saveMessage','Saving to WTCC cloud...');
+let r=await db.from('opportunities').insert(row).select().single();
+if(r.error){say('saveMessage','Save error: '+r.error.message);return}
+leads.unshift(r.data);
+['title','business','location','value','contact','contactinfo','notes'].forEach(x=>$(x).value='');
+say('saveMessage','Opportunity saved successfully.');say('cloud','Cloud connected');render();
+}
+async function changeStatus(id,status){
+let r=await db.from('opportunities').update({status,updated_at:new Date().toISOString()}).eq('id',id);
+if(r.error){alert(r.error.message);return}
+let l=leads.find(x=>x.id===id);if(l)l.status=status;render();
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+$('count').textContent=leads.length;
+let q=$('search').value.toLowerCase();
+let list=leads.filter(x=>[x.title,x.business_name,x.trade,x.location].join(' ').toLowerCase().includes(q));
+$('leads').innerHTML=list.length?list.map(x=>`<div class="lead"><b>${esc(x.title)}</b><p class="muted">${esc(x.business_name)} · ${esc(x.trade)} · ${esc(x.location)}</p><p class="status">${esc(x.status)}</p><select onchange="changeStatus('${x.id}',this.value)"><option ${x.status==='Review needed'?'selected':''}>Review needed</option><option ${x.status==='Approved'?'selected':''}>Approved</option><option ${x.status==='Contacted'?'selected':''}>Contacted</option><option ${x.status==='Estimate requested'?'selected':''}>Estimate requested</option><option ${x.status==='Quoted'?'selected':''}>Quoted</option><option ${x.status==='Negotiating'?'selected':''}>Negotiating</option><option ${x.status==='Won'?'selected':''}>Won</option><option ${x.status==='Lost'?'selected':''}>Lost</option><option ${x.status==='Rejected'?'selected':''}>Rejected</option></select></div>`).join(''):'<p class="muted">No opportunities found. Add your first job above.</p>';
+}
+async function logout(){await db.auth.signOut();user=null;leads=[];$('app').classList.add('hidden');$('login').classList.remove('hidden')}
+db.auth.getSession().then(async r=>{if(r.data.session){user=r.data.session.user;await start()}});
+</script>
+</body>
+</html>
