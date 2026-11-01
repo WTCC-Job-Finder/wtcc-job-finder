@@ -66,6 +66,18 @@ let user=null,leads=[];
 const $=id=>document.getElementById(id);
 function say(id,msg){$(id).textContent=msg}
 async function auth(mode){
+try{
+if(!db){say('message','Connection error: Supabase library did not load. Refresh the page and try again.');return}
+let email=$('email').value.trim(),password=$('password').value;
+if(!email||password.length<8){say('message','Enter your email and a password of at least 8 characters.');return}
+say('message','Connecting to Supabase...');
+let r=mode==='up'?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});
+if(r.error){say('message','Supabase error: '+r.error.message);return}
+if(mode==='up'&&!r.data.session){say('message','Account created. Check your email for confirmation, then sign in.');return}
+user=r.data.user;
+await start();
+}catch(e){say('message','Application error: '+(e.message||String(e)))}
+}
 let email=$('email').value.trim(),password=$('password').value;
 if(!email||password.length<8){say('message','Enter your email and a password of at least 8 characters.');return}
 say('message','Connecting...');
