@@ -61,7 +61,7 @@
 <script>
 const URL="https://ogotiipxtklpdcfzcskf.supabase.co";
 const KEY="sb_publishable_Ho14cZshVRJHS66v6za92w_UvjUmh-A";
-const db=supabase.createClient(URL,KEY);
+const db=window.supabase?.createClient?window.supabase.createClient(URL,KEY):null;
 let user=null,leads=[];
 const $=id=>document.getElementById(id);
 function say(id,msg){$(id).textContent=msg}
